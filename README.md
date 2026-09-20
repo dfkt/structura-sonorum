@@ -23,6 +23,11 @@ Select **Build → Build Bundle(s) / APK(s) → Build APK(s)**. The generated de
 
 Alternatively, after installing the SDK and Gradle 8.13, run `gradle :app:assembleDebug` inside this folder. The local Android SDK should be configured through Android Studio or `ANDROID_HOME`. Do not distribute an unsigned release APK.
 
-## What has and has not been verified
+## Tested devices
 
-Source reviewed for API and manifest consistency. This environment lacks Android SDK, Gradle, and a Java compiler, and Android's distribution server was unreachable here, so the app has **not** been compiled or device-tested yet. The APK path above is the expected output after a successful build on your machine, not a file included in this archive. Please test audio routing, background playback, focus interruptions, and battery use on your device before relying on it.
+Version 1.9 has been compiled successfully and tested on two Android 16 devices:
+
+- Samsung Galaxy S25+ — One UI 8.5
+- Samsung Galaxy Tab S8+ — One UI 8.0
+
+The app runs well on both devices. Testing on these devices does not guarantee identical behavior on every Android device or manufacturer configuration.
