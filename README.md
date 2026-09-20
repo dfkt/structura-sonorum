@@ -2,6 +2,11 @@
 
 An Android sound generator with independent noise, click, and sine generators. Each generator has its own volume, pan, sound controls, and mute button. No samples, ads, accounts, or network permission. Settings are saved on every change. Playback does not start automatically when the app opens. Generators of the same kind appear together.
 
+<p align="center">
+  <img src="screenshots/structura-sonorum-interface.jpg" alt="Structura Sonorum interface on Android" width="400">
+</p>
+<p align="center"><em>Structura Sonorum running on a Samsung Galaxy S25+ with Android 16.</em></p>
+
 ## Controls
 
 - Noise: darker than brown at the far left, pink near the middle, and bright/white at the right. The volume control has 0.1% steps, and darker noise receives progressive level compensation because heavy filtering otherwise makes it much quieter than white noise.
