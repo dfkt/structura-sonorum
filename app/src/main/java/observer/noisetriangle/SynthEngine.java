@@ -109,6 +109,7 @@ final class SynthEngine {
         final int type;
         Layer layer;
         double gain, phase, lfoPhase, brown, pink, ultraBrown;
+        double noisePower = 0.09, noiseLevel = 1;
         double clickCountdown;
         final List<Pulse> pulses = new ArrayList<>();
         Voice(long id, int type) { this.id = id; this.type = type; }
@@ -128,13 +129,16 @@ final class SynthEngine {
                 double white = random.nextDouble() * 2 - 1;
                 pink = 0.985 * pink + 0.015 * white;
                 brown = Math.max(-1, Math.min(1, brown * 0.998 + white * 0.035));
-                // An additional slow low-pass stage makes the far left darker than brown.
+                // An additional slow low-pass stage makes the far left sub-Brownian.
                 ultraBrown += 0.00035 * (brown - ultraBrown);
-                double position = l.parameter / 100.0;
+                double position = l.parameter / 1000.0;
                 double value;
                 if (position < 0.25) {
-                    double blend = position * 4;
-                    value = ultraBrown * 3 * (1 - blend) + brown * blend;
+                    double blend = position / 0.25;
+                    // Smoothstep makes the newly added 0.1% steps especially fine near
+                    // the very dark end, where small spectral changes are most audible.
+                    blend = blend * blend * (3 - 2 * blend);
+                    value = ultraBrown * (1 - blend) + brown * blend;
                 } else if (position < 0.65) {
                     double blend = (position - 0.25) / 0.4;
                     value = brown * (1 - blend) + pink * 5 * blend;
@@ -142,9 +146,16 @@ final class SynthEngine {
                     double blend = (position - 0.65) / 0.35;
                     value = pink * 5 * (1 - blend) + white * blend;
                 }
-                // Compensate for the lower perceived/RMS level of strongly filtered noise.
-                double spectralGain = 2.5 - 1.5 * position;
-                return value * gain * spectralGain;
+                // A slow normalizer compensates for energy lost by dark filtering without
+                // pumping. Above the Pink anchor, reduce the RMS target progressively because
+                // high-frequency energy is perceived as louder even at the same measured RMS.
+                noisePower += 0.0003 * (value * value - noisePower);
+                double bright = Math.max(0, (position - 0.65) / 0.35);
+                double targetRms = 0.30 - 0.10 * bright;
+                double desiredLevel = targetRms / Math.sqrt(Math.max(0.0001, noisePower));
+                desiredLevel = Math.max(0.25, Math.min(8.0, desiredLevel));
+                noiseLevel += 0.00005 * (desiredLevel - noiseLevel);
+                return value * gain * noiseLevel;
             }
             if (--clickCountdown <= 0) {
                 double jitter = -Math.log(Math.max(1e-9, random.nextDouble()));

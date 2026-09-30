@@ -276,7 +276,7 @@ public final class MainActivity extends Activity {
     private void showAbout() {
         String url = "https://dfkt.at/";
         String content = "Structura Sonorum v" + getPackageVersion()
-                + "\nCreated 2026 by DFKT\n\n" + url;
+                + "\nBuilt 2026 by DFKT\n\n" + url;
         SpannableString linked = new SpannableString(content);
         linked.setSpan(new URLSpan(url), content.lastIndexOf(url), content.length(),
                 Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -291,7 +291,7 @@ public final class MainActivity extends Activity {
     }
     private String getPackageVersion() {
         try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
-        catch (android.content.pm.PackageManager.NameNotFoundException ex) { return "1.9"; }
+        catch (android.content.pm.PackageManager.NameNotFoundException ex) { return "1.10"; }
     }
     private void renderLayers() {
         list.removeAllViews();
@@ -336,8 +336,13 @@ public final class MainActivity extends Activity {
                 return String.format(Locale.US, "%+d%% (%s)", pan, pan < 0 ? "L" : "R");
             });
             if (type == Layer.NOISE) {
-                addSlider(card, "Color", layer.parameter, 100, x -> {
-                    layer.parameter = x; return x == 0 ? "sub-brown / dark" : x == 100 ? "white / bright" : x + "%";
+                addSlider(card, "Color", layer.parameter, 1000, x -> {
+                    layer.parameter = x;
+                    if (x == 0) return "0% · sub-Brownian / dark";
+                    if (x == 250) return "25% · Brownian";
+                    if (x == 650) return "65% · Pink";
+                    if (x == 1000) return "100% · White / bright";
+                    return String.format(Locale.US, "%.1f%%", x / 10.0);
                 });
             } else if (type == Layer.CLICK) {
                 addSlider(card, "Speed", layer.speed, 100, x -> { layer.speed = x; return (20 + 180 * x / 100) + " BPM"; });
@@ -425,7 +430,7 @@ public final class MainActivity extends Activity {
         }
     }
     private static String name(int type) {
-        return type == Layer.NOISE ? "Noise" : type == Layer.CLICK ? "Click" : "Sine";
+        return type == Layer.NOISE ? "Noise" : type == Layer.CLICK ? "Impulse" : "Sine";
     }
     private int buttonShade(int type) {
         int c = COLORS[type];

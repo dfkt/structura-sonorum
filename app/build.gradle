@@ -8,8 +8,8 @@ android {
         applicationId 'observer.noisetriangle'
         minSdk 26
         targetSdk 34
-        versionCode 19
-        versionName '1.9'
+        versionCode 20
+        versionName '1.10'
     }
     compileOptions {
         sourceCompatibility JavaVersion.VERSION_17
