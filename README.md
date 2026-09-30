@@ -34,7 +34,7 @@ Alternatively, after installing the SDK and Gradle 8.13, run `gradle :app:assemb
 
 ## Tested devices
 
-Version 1.9 was compiled successfully and tested on two Android 16 devices:
+Version 1.10 was compiled successfully and tested on two Android 16 devices:
 
 - Samsung Galaxy S25+ — One UI 8.5
 - Samsung Galaxy Tab S8+ — One UI 8.0
