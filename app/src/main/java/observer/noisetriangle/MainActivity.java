@@ -485,7 +485,22 @@ public final class MainActivity extends Activity {
         int pad = dp(20);
         LinearLayout holder = column();
         holder.setPadding(pad, 0, pad, 0);
-        holder.addView(input, new LinearLayout.LayoutParams(-1, -2));
+        LinearLayout entry = new LinearLayout(this);
+        entry.setGravity(Gravity.CENTER_VERTICAL);
+        entry.addView(input, new LinearLayout.LayoutParams(0, -2, 1));
+        if (numeric.min < 0) {
+            Button sign = new Button(this);
+            sign.setText("±");
+            sign.setContentDescription("Change sign");
+            sign.setOnClickListener(v -> {
+                String value = input.getText().toString().trim();
+                if (value.startsWith("-")) value = value.substring(1);
+                else if (!value.isEmpty() && !"0".equals(value)) value = "-" + value;
+                input.setText(value); input.setSelection(value.length());
+            });
+            entry.addView(sign, new LinearLayout.LayoutParams(dp(56), -2));
+        }
+        holder.addView(entry, new LinearLayout.LayoutParams(-1, -2));
         String range = "Enter a value from " + editableNumber(numeric.min) + " to "
                 + editableNumber(numeric.max) + (numeric.unit.isEmpty() ? "." : " " + numeric.unit + ".");
         AlertDialog dialog = new AlertDialog.Builder(this)
