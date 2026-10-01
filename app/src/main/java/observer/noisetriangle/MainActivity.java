@@ -20,12 +20,15 @@ import android.os.Build;
 import android.os.Bundle;
 import android.text.SpannableString;
 import android.text.Spanned;
+import android.text.InputType;
 import android.text.method.LinkMovementMethod;
 import android.text.style.URLSpan;
 import android.view.Gravity;
 import android.view.View;
 import android.view.ViewGroup;
+import android.view.WindowManager;
 import android.widget.Button;
+import android.widget.EditText;
 import android.widget.ImageButton;
 import android.widget.LinearLayout;
 import android.widget.ScrollView;
@@ -67,8 +70,17 @@ public final class MainActivity extends Activity {
         layers = Layer.decode(getPreferences(MODE_PRIVATE).getString("layers", null));
         buildUi();
         if (Build.VERSION.SDK_INT >= 33 && checkSelfPermission(Manifest.permission.POST_NOTIFICATIONS)
-                != PackageManager.PERMISSION_GRANTED)
-            requestPermissions(new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1);
+                != PackageManager.PERMISSION_GRANTED
+                && !getPreferences(MODE_PRIVATE).getBoolean("notificationExplanationShown", false)) {
+            getPreferences(MODE_PRIVATE).edit().putBoolean("notificationExplanationShown", true).apply();
+            new AlertDialog.Builder(this)
+                    .setTitle("Allow playback controls?")
+                    .setMessage("Structura Sonorum uses notifications only to keep audio playback available in the background and to provide Play/Pause and Exit controls. It does not send promotional notifications.")
+                    .setNegativeButton("Not now", (dialog, which) -> dialog.dismiss())
+                    .setPositiveButton("Continue", (dialog, which) -> requestPermissions(
+                            new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1))
+                    .show();
+        }
     }
     @Override public void onStart() {
         super.onStart();
@@ -291,7 +303,7 @@ public final class MainActivity extends Activity {
     }
     private String getPackageVersion() {
         try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
-        catch (android.content.pm.PackageManager.NameNotFoundException ex) { return "1.10"; }
+        catch (android.content.pm.PackageManager.NameNotFoundException ex) { return "1.11"; }
     }
     private void renderLayers() {
         list.removeAllViews();
@@ -328,13 +340,13 @@ public final class MainActivity extends Activity {
             addSlider(card, "Volume", layer.volume, 1000, x -> {
                 layer.volume = x;
                 return String.format(Locale.US, "%.1f%%", x / 10.0);
-            });
+            }, numeric(0, 100, "%", x -> x / 10.0, x -> (int)Math.round(x * 10)));
             addSlider(card, "Pan", layer.pan, 200, x -> {
                 layer.pan = x;
                 int pan = x - 100;
                 if (pan == 0) return "center";
                 return String.format(Locale.US, "%+d%% (%s)", pan, pan < 0 ? "L" : "R");
-            });
+            }, numeric(-100, 100, "%", x -> x - 100, x -> (int)Math.round(x + 100)));
             if (type == Layer.NOISE) {
                 addSlider(card, "Color", layer.parameter, 1000, x -> {
                     layer.parameter = x;
@@ -343,35 +355,50 @@ public final class MainActivity extends Activity {
                     if (x == 650) return "65% · Pink";
                     if (x == 1000) return "100% · White / bright";
                     return String.format(Locale.US, "%.1f%%", x / 10.0);
-                });
+                }, numeric(0, 100, "%", x -> x / 10.0, x -> (int)Math.round(x * 10)));
             } else if (type == Layer.CLICK) {
-                addSlider(card, "Speed", layer.speed, 100, x -> { layer.speed = x; return (20 + 180 * x / 100) + " BPM"; });
-                addSlider(card, "Randomness", layer.randomness, 100, x -> { layer.randomness = x; return x + "%"; });
-                addSlider(card, "Brightness", layer.brightness, 100, x -> { layer.brightness = x; return x + "%"; });
+                addSlider(card, "Speed", layer.speed, 3800, x -> {
+                    layer.speed = x;
+                    double bpm = 20 + x / 10.0;
+                    return (x % 10 == 0 ? String.format(Locale.US, "%.0f", bpm)
+                            : String.format(Locale.US, "%.1f", bpm)) + " BPM";
+                }, numeric(20, 400, "BPM", x -> 20 + x / 10.0,
+                        x -> (int)Math.round((x - 20) * 10)));
+                addSlider(card, "Randomness", layer.randomness, 100, x -> {
+                    layer.randomness = x; return x + "%";
+                }, numeric(0, 100, "%", x -> x, x -> (int)Math.round(x)));
+                addSlider(card, "Brightness", layer.brightness, 100, x -> {
+                    layer.brightness = x; return x + "%";
+                }, numeric(0, 100, "%", x -> x, x -> (int)Math.round(x)));
                 addSlider(card, "Decay", layer.decay, 100, x -> {
                     layer.decay = x; return String.format(Locale.US, "%.3f s", layer.decaySeconds());
-                });
+                }, numeric(0.003, 10, "s",
+                        x -> x == 0 ? 0.003 : 0.003 * Math.pow(10.0 / 0.003, x / 100.0),
+                        x -> (int)Math.round(Math.log(x / 0.003) / Math.log(10.0 / 0.003) * 100)));
             } else {
                 final TextView[] frequencyLabels = new TextView[2];
                 frequencyLabels[0] = addSlider(card, "Frequency · coarse", layer.parameter, 100, x -> {
                     layer.parameter = x;
                     updateSineLabels(layer, frequencyLabels);
                     return coarseFrequencyText(layer);
-                });
+                }, numeric(25, 15000, "Hz", x -> 25 * Math.pow(600, x / 100.0),
+                        x -> (int)Math.round(Math.log(x / 25) / Math.log(600) * 100)));
                 frequencyLabels[1] = addSlider(card, "Frequency · fine", layer.fine, 500, x -> {
                     layer.fine = x;
                     updateSineLabels(layer, frequencyLabels);
                     return fineFrequencyText(layer);
-                });
+                }, numeric(-25, 25, "Hz", x -> (x - 250) / 10.0,
+                        x -> (int)Math.round(x * 10 + 250)));
                 updateSineLabels(layer, frequencyLabels);
                 addSlider(card, "Fluctuation", layer.fluctuation, 100, x -> {
                     layer.fluctuation = x; return "±" + x + " Hz";
-                });
+                }, numeric(0, 100, "Hz", x -> x, x -> (int)Math.round(x)));
                 addSlider(card, "Fluctuation speed", layer.fluctuationSpeed, 100, x -> {
                     layer.fluctuationSpeed = x;
                     double hz = layer.fluctuationRate();
                     return String.format(Locale.US, "%.2f Hz · %.1f BPM", hz, hz * 60);
-                });
+                }, numeric(0.1, 100, "Hz", x -> 0.1 * Math.pow(1000, x / 100.0),
+                        x -> (int)Math.round(Math.log(x / 0.1) / Math.log(1000) * 100)));
             }
             updateCardAppearance(card, layer, mute, remove);
             if (layer.id == focusLayerId) {
@@ -395,12 +422,37 @@ public final class MainActivity extends Activity {
                 (layer.fine - 250) / 10.0, layer.frequency());
     }
     private void updateSineLabels(Layer layer, TextView[] labels) {
-        if (labels[0] != null) labels[0].setText("Frequency · coarse · " + coarseFrequencyText(layer));
-        if (labels[1] != null) labels[1].setText("Frequency · fine · " + fineFrequencyText(layer));
+        if (labels[0] != null) {
+            labels[0].setText("Frequency · coarse · " + coarseFrequencyText(layer));
+            labels[0].setContentDescription(labels[0].getText() + ", tap to edit value");
+        }
+        if (labels[1] != null) {
+            labels[1].setText("Frequency · fine · " + fineFrequencyText(layer));
+            labels[1].setContentDescription(labels[1].getText() + ", tap to edit value");
+        }
     }
     private interface Setting { String set(int value); }
-    private TextView addSlider(LinearLayout card, String title, int value, int max, Setting setting) {
+    private interface ProgressNumber { double get(int progress); }
+    private interface NumberProgress { int get(double number); }
+    private static final class NumericInput {
+        final double min, max;
+        final String unit;
+        final ProgressNumber fromProgress;
+        final NumberProgress toProgress;
+        NumericInput(double min, double max, String unit,
+                ProgressNumber fromProgress, NumberProgress toProgress) {
+            this.min = min; this.max = max; this.unit = unit;
+            this.fromProgress = fromProgress; this.toProgress = toProgress;
+        }
+    }
+    private static NumericInput numeric(double min, double max, String unit,
+            ProgressNumber fromProgress, NumberProgress toProgress) {
+        return new NumericInput(min, max, unit, fromProgress, toProgress);
+    }
+    private TextView addSlider(LinearLayout card, String title, int value, int max,
+            Setting setting, NumericInput numeric) {
         TextView caption = label(title + " · " + setting.set(value), 14);
+        caption.setContentDescription(caption.getText() + ", tap to edit value");
         card.addView(caption);
         SeekBar bar = new SeekBar(this);
         bar.setMax(max); bar.setProgress(value);
@@ -410,12 +462,62 @@ public final class MainActivity extends Activity {
         card.addView(bar);
         bar.setOnSeekBarChangeListener(new SeekBar.OnSeekBarChangeListener() {
             @Override public void onProgressChanged(SeekBar b, int v, boolean user) {
-                if (user) { caption.setText(title + " · " + setting.set(v)); changed(false); }
+                if (user) {
+                    caption.setText(title + " · " + setting.set(v));
+                    caption.setContentDescription(caption.getText() + ", tap to edit value");
+                    changed(false);
+                }
             }
             @Override public void onStartTrackingTouch(SeekBar b) { }
             @Override public void onStopTrackingTouch(SeekBar b) { }
         });
+        caption.setOnClickListener(v -> showNumberEditor(title, caption, bar, setting, numeric));
         return caption;
+    }
+    private void showNumberEditor(String title, TextView caption, SeekBar bar,
+            Setting setting, NumericInput numeric) {
+        EditText input = new EditText(this);
+        input.setSingleLine(true);
+        input.setSelectAllOnFocus(true);
+        input.setInputType(InputType.TYPE_CLASS_NUMBER | InputType.TYPE_NUMBER_FLAG_DECIMAL
+                | InputType.TYPE_NUMBER_FLAG_SIGNED);
+        input.setText(editableNumber(numeric.fromProgress.get(bar.getProgress())));
+        int pad = dp(20);
+        LinearLayout holder = column();
+        holder.setPadding(pad, 0, pad, 0);
+        holder.addView(input, new LinearLayout.LayoutParams(-1, -2));
+        String range = "Enter a value from " + editableNumber(numeric.min) + " to "
+                + editableNumber(numeric.max) + (numeric.unit.isEmpty() ? "." : " " + numeric.unit + ".");
+        AlertDialog dialog = new AlertDialog.Builder(this)
+                .setTitle(title).setMessage(range).setView(holder)
+                .setNegativeButton("Cancel", (d, which) -> d.dismiss())
+                .setPositiveButton("Set", null).create();
+        dialog.setOnShowListener(unused -> {
+            dialog.getButton(AlertDialog.BUTTON_POSITIVE).setOnClickListener(v -> {
+                try {
+                    double number = Double.parseDouble(input.getText().toString().trim().replace(',', '.'));
+                    if (!Double.isFinite(number) || number < numeric.min || number > numeric.max) {
+                        input.setError(range); return;
+                    }
+                    int progress = Math.max(0, Math.min(bar.getMax(), numeric.toProgress.get(number)));
+                    bar.setProgress(progress);
+                    caption.setText(title + " · " + setting.set(progress));
+                    caption.setContentDescription(caption.getText() + ", tap to edit value");
+                    changed(false);
+                    dialog.dismiss();
+                } catch (NumberFormatException ex) { input.setError("Enter a numerical value."); }
+            });
+            input.requestFocus();
+            if (dialog.getWindow() != null) dialog.getWindow().setSoftInputMode(
+                    WindowManager.LayoutParams.SOFT_INPUT_STATE_ALWAYS_VISIBLE);
+        });
+        dialog.show();
+    }
+    private static String editableNumber(double value) {
+        String text = String.format(Locale.US, "%.3f", value);
+        while (text.contains(".") && text.endsWith("0")) text = text.substring(0, text.length() - 1);
+        if (text.endsWith(".")) text = text.substring(0, text.length() - 1);
+        return text;
     }
     private void changed(boolean rebuild) {
         getPreferences(MODE_PRIVATE).edit().putString("layers", Layer.encode(layers)).apply();

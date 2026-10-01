@@ -25,7 +25,7 @@ final class Layer {
         for (Layer l : layers) {
             JSONObject o = new JSONObject();
             try {
-                o.put("schema", 5); o.put("type", l.type); o.put("id", l.id); o.put("volume", l.volume);
+                o.put("schema", 6); o.put("type", l.type); o.put("id", l.id); o.put("volume", l.volume);
                 o.put("pan", l.pan);
                 o.put("parameter", l.parameter); o.put("speed", l.speed);
                 o.put("randomness", l.randomness); o.put("brightness", l.brightness);
@@ -55,8 +55,10 @@ final class Layer {
                 l.parameter = type == NOISE
                         ? clamp(schema >= 5 ? savedParameter : savedParameter * 10, 1000)
                         : clamp(savedParameter, 100);
-                // Preserve earlier impulse character approximately when migrating old settings.
-                l.speed = clamp(o.optInt("speed", l.parameter), 100);
+                // v1.11 stores impulse speed as a 0.1 BPM offset above 20 BPM.
+                int oldSpeed = o.optInt("speed", type == CLICK ? savedParameter : 0);
+                l.speed = schema >= 6 ? clamp(oldSpeed, 3800)
+                        : clamp((int)Math.round(oldSpeed * 18.0), 3800);
                 l.randomness = clamp(o.optInt("randomness", l.parameter), 100);
                 l.brightness = clamp(o.optInt("brightness", l.parameter), 100);
                 l.decay = clamp(o.optInt("decay", 0), 100);

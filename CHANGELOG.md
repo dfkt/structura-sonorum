@@ -2,6 +2,18 @@
 
 Versions are listed newest first. This history is reconstructed from the development conversations and GitHub commits. Changes from the earliest builds are grouped together because their individual version numbers could not be verified. Dates use Vienna local time.
 
+## 1.11 — 2026-10-01
+
+- Extended the Impulse speed range from **20–200 BPM** to **20–400 BPM**, with **0.1 BPM** internal resolution.
+- Added precise numerical entry for every slider by tapping its value label. Signed and decimal values are accepted where applicable, comma and point decimal separators are supported, and entries are validated against each control's range.
+- Restored the v1.9 noise synthesis mix and fixed compensation curve after the v1.10 adaptive normalizer weakened the preferred dark bass character; retained v1.10's **0.1%** color resolution and labeled anchors.
+- Added short master fade-in and fade-out envelopes to reduce discontinuity clicks during play, pause, master mute, import, and exit.
+- Added a platform media session so standard wired and Bluetooth earphone play/pause controls can operate global playback without adding a large external media framework.
+- Added a one-time explanation before Android's notification permission request, clarifying that notifications provide background playback controls and are not promotional.
+- Updated configuration migration so existing Impulse speeds and older JSON backups remain compatible with the expanded speed range.
+- Updated the README with the approximate **40 KB** release size, precise label-tap input, perceptual interaction between generators, headset controls, fade behavior, and revised noise implementation.
+- Updated release metadata to **version 1.11** with `versionCode 21`.
+
 ## 1.10 — 2026-09-30
 
 - Renamed the Click generator to **Impulse** throughout the user interface and README.

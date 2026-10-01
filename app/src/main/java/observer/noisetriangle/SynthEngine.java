@@ -10,10 +10,18 @@ import java.util.Random;
 
 final class SynthEngine {
     private static final int RATE = 48000;
+    private static final int FADE_IN_SAMPLES = RATE / 50;  // 20 ms
+    private static final int FADE_OUT_SAMPLES = RATE * 3 / 100; // 30 ms
     private final Random random = new Random();
     private volatile boolean running;
     private volatile boolean masterMuted;
-    void setMasterMuted(boolean muted) { masterMuted = muted; }
+    private volatile boolean stopping;
+    private volatile double masterTarget = 1;
+    private double masterGain;
+    void setMasterMuted(boolean muted) {
+        masterMuted = muted;
+        masterTarget = muted ? 0 : 1;
+    }
     private Thread worker;
     private AudioTrack track;
     private List<Voice> voices = new ArrayList<>();
@@ -45,6 +53,9 @@ final class SynthEngine {
             if (track.getState() != AudioTrack.STATE_INITIALIZED) {
                 track.release(); track = null; return false;
             }
+            masterGain = 0;
+            masterTarget = masterMuted ? 0 : 1;
+            stopping = false;
             track.play(); running = true;
             worker = new Thread(this::render, "Structura Sonorum audio"); worker.start();
             return true;
@@ -56,14 +67,16 @@ final class SynthEngine {
     void stop() {
         Thread thread;
         synchronized (this) {
-            running = false; thread = worker;
-            if (track != null) track.pause();
+            stopping = true;
+            masterTarget = 0;
+            thread = worker;
         }
         if (thread != null && thread != Thread.currentThread()) {
             try { thread.join(1500); } catch (InterruptedException ex) { Thread.currentThread().interrupt(); }
         }
         synchronized (this) {
-            if (track != null) { track.flush(); track.release(); track = null; }
+            running = false;
+            if (track != null) { track.pause(); track.flush(); track.release(); track = null; }
             worker = null;
         }
     }
@@ -71,6 +84,7 @@ final class SynthEngine {
         Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO);
         short[] pcm = new short[1024 * 2];
         while (running) {
+            boolean finishAfterBuffer = false;
             synchronized (this) {
                 for (int i = 0; i < pcm.length; i += 2) {
                     double sumLeft = 0, sumRight = 0;
@@ -81,8 +95,13 @@ final class SynthEngine {
                         sumLeft += mono * Math.cos(angle) * Math.sqrt(2);
                         sumRight += mono * Math.sin(angle) * Math.sqrt(2);
                     }
-                    double left = masterMuted ? 0 : Math.tanh(sumLeft * 0.55) * 0.65;
-                    double right = masterMuted ? 0 : Math.tanh(sumRight * 0.55) * 0.65;
+                    if (masterGain < masterTarget)
+                        masterGain = Math.min(masterTarget, masterGain + 1.0 / FADE_IN_SAMPLES);
+                    else if (masterGain > masterTarget)
+                        masterGain = Math.max(masterTarget, masterGain - 1.0 / FADE_OUT_SAMPLES);
+                    if (stopping && masterGain <= 0) finishAfterBuffer = true;
+                    double left = Math.tanh(sumLeft * 0.55) * 0.65 * masterGain;
+                    double right = Math.tanh(sumRight * 0.55) * 0.65 * masterGain;
                     pcm[i] = (short) Math.round(left * 32767);
                     pcm[i + 1] = (short) Math.round(right * 32767);
                 }
@@ -95,6 +114,7 @@ final class SynthEngine {
                 if (count <= 0) { running = false; break; }
                 offset += count;
             }
+            if (finishAfterBuffer) running = false;
         }
     }
     private static final class Pulse {
@@ -109,7 +129,6 @@ final class SynthEngine {
         final int type;
         Layer layer;
         double gain, phase, lfoPhase, brown, pink, ultraBrown;
-        double noisePower = 0.09, noiseLevel = 1;
         double clickCountdown;
         final List<Pulse> pulses = new ArrayList<>();
         Voice(long id, int type) { this.id = id; this.type = type; }
@@ -134,11 +153,8 @@ final class SynthEngine {
                 double position = l.parameter / 1000.0;
                 double value;
                 if (position < 0.25) {
-                    double blend = position / 0.25;
-                    // Smoothstep makes the newly added 0.1% steps especially fine near
-                    // the very dark end, where small spectral changes are most audible.
-                    blend = blend * blend * (3 - 2 * blend);
-                    value = ultraBrown * (1 - blend) + brown * blend;
+                    double blend = position * 4;
+                    value = ultraBrown * 3 * (1 - blend) + brown * blend;
                 } else if (position < 0.65) {
                     double blend = (position - 0.25) / 0.4;
                     value = brown * (1 - blend) + pink * 5 * blend;
@@ -146,21 +162,15 @@ final class SynthEngine {
                     double blend = (position - 0.65) / 0.35;
                     value = pink * 5 * (1 - blend) + white * blend;
                 }
-                // A slow normalizer compensates for energy lost by dark filtering without
-                // pumping. Above the Pink anchor, reduce the RMS target progressively because
-                // high-frequency energy is perceived as louder even at the same measured RMS.
-                noisePower += 0.0003 * (value * value - noisePower);
-                double bright = Math.max(0, (position - 0.65) / 0.35);
-                double targetRms = 0.30 - 0.10 * bright;
-                double desiredLevel = targetRms / Math.sqrt(Math.max(0.0001, noisePower));
-                desiredLevel = Math.max(0.25, Math.min(8.0, desiredLevel));
-                noiseLevel += 0.00005 * (desiredLevel - noiseLevel);
-                return value * gain * noiseLevel;
+                // Restore the stable v1.9 compensation curve. The finer 0.1% slider
+                // resolution remains, but the dark-noise character is unchanged.
+                double spectralGain = 2.5 - 1.5 * position;
+                return value * gain * spectralGain;
             }
             if (--clickCountdown <= 0) {
                 double jitter = -Math.log(Math.max(1e-9, random.nextDouble()));
                 double interval = 1 + (jitter - 1) * l.randomness / 100.0;
-                clickCountdown = Math.max(1, RATE * 60.0 / (20 + 180 * l.speed / 100.0) * interval);
+                clickCountdown = Math.max(1, RATE * 60.0 / (20 + l.speed / 10.0) * interval);
                 if (pulses.size() < 48) pulses.add(new Pulse(l.brightness / 100.0,
                         l.decaySeconds(), random.nextBoolean() ? 1 : -1));
             }
