@@ -22,7 +22,12 @@ The generators are mixed into one output and can interact in unexpected perceptu
 - Noise: sub-Brownian/dark at 0%, Brownian at 25%, approximate pink at 75%, and white/bright at 100%. Version 1.14 expands the very dark portion of the spectrum across more of the 0–25% range and applies a smooth, measurement-derived loudness-compensation curve. Bass boost is deliberately limited to protect headroom; most compensation comes from attenuating the perceptually louder colors. The separate color and volume controls both have 0.1% steps.
 - Impulse: speed is 20–400 BPM with 0.1 BPM internal resolution. Randomness ranges from regular spacing to exponentially distributed intervals. Brightness ranges from a low drum-like tone to a short bright transient. Decay runs logarithmically from a 3 ms impulse to a 10 second fade; long decays can overlap.
 - Sine: coarse frequency runs logarithmically from 25 Hz to 15 kHz. Fine frequency offsets −25 to +25 Hz in 0.1 Hz steps, centered at zero. The total frequency label updates with both controls. Fluctuation adjusts pitch modulation from 0 to ±100 Hz; its speed ranges logarithmically from 0.1 to 100 Hz and is displayed in both Hz and BPM. At high modulation speed it may sound like FM rather than a slow wobble.
-- Every generator has equal-power stereo pan from −100% (left) to +100% (right), centered initially. Extreme opposite pan settings can be used for separate sine frequencies in the two ears. The matching pause/play icon mutes or unmutes a generator; the X icon removes it. Initially there is one generator of each kind, with pan and sine fine frequency centered, all other sliders at the left, and playback paused.
+
+Every generator type has equal-power stereo pan from -100% (left) to +100% (right). For the sine generators, extreme opposite pan settings can be used to generate binaural beats. Regular beat interference patterns are possible as well, with or without the pan settings.
+
+For the impulse generators, the dedicated speed controls per instance are helpful to create polyrhythms.
+
+The pause/play icon mutes or unmutes a generator; the X icon removes it. Initially there is one generator of each kind, with all sliders set to their default values, and playback paused. More can be added, limited only by the processing power of the device.
 
 For precise values on a small screen, tap the numerical label above any slider and enter a value directly. Signed and decimal values are accepted where applicable; special descriptions such as Brownian noise do not need to be entered.
 
