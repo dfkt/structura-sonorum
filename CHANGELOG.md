@@ -2,6 +2,12 @@
 
 Versions are listed newest first. This history is reconstructed from the development conversations and GitHub commits. Changes from the earliest builds are grouped together because their individual version numbers could not be verified. Dates use Vienna local time.
 
+## 1.13 — 2026-10-01
+
+- Fixed a service lifecycle race introduced in v1.12 when importing a configuration during playback. Fade-out, configuration replacement, and restart now happen in one atomic service command, so Android cannot destroy the newly restarted audio engine between separate Stop and Sync commands.
+- Recorded successful v1.12 compilation and testing on the Samsung Galaxy S25+, including confirmation that the playback and pan discontinuity clicks were resolved.
+- Updated release metadata to **version 1.13** with `versionCode 23`.
+
 ## 1.12 — 2026-10-01
 
 - Removed the v1.11 platform media session and headset-button integration because it caused regressions on Samsung devices: the triangle status icon disappeared, Exit was omitted, and Android added a nonfunctional progress bar. Restored the compact notification presentation used before v1.11.

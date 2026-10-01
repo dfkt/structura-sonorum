@@ -38,9 +38,7 @@ Alternatively, after installing the SDK and Gradle 8.13, run `gradle :app:assemb
 
 ## Tested devices
 
-Version 1.10 was compiled successfully and tested on two Android 16 devices:
+- Version 1.12 was compiled successfully and tested on a Samsung Galaxy S25+ with Android 16 / One UI 8.5. Playback, import, and pan discontinuity clicks were confirmed resolved.
+- Version 1.10 was compiled successfully and tested on a Samsung Galaxy Tab S8+ with Android 16 / One UI 8.0.
 
-- Samsung Galaxy S25+ — One UI 8.5
-- Samsung Galaxy Tab S8+ — One UI 8.0
-
-The app runs well on both devices. Testing on these devices does not guarantee identical behavior on every Android device or manufacturer configuration.
+Testing on these devices does not guarantee identical behavior on every Android device or manufacturer configuration.
