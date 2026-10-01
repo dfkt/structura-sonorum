@@ -361,7 +361,7 @@ public final class MainActivity extends Activity {
                     layer.parameter = x;
                     if (x == 0) return "0% · sub-Brownian / dark";
                     if (x == 250) return "25% · Brownian";
-                    if (x == 650) return "65% · Pink";
+                    if (x == 750) return "75% · Pink";
                     if (x == 1000) return "100% · White / bright";
                     return String.format(Locale.US, "%.1f%%", x / 10.0);
                 }, numeric(0, 100, "%", x -> x / 10.0, x -> (int)Math.round(x * 10)));

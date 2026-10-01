@@ -13,6 +13,46 @@ final class SynthEngine {
     private static final int FADE_IN_SAMPLES = RATE / 50;  // 20 ms
     private static final int FADE_OUT_SAMPLES = RATE * 3 / 100; // 30 ms
     private static final double PAN_SMOOTHING = 0.002;
+    private static final double NOISE_COLOR_SMOOTHING = 0.0015;
+    private static final double[] NOISE_MEASURED_POSITIONS = {
+            0, .01, .02, .03, .05, .075, .10, .15, .20, .25,
+            .35, .45, .55, .65, .70, .75, .80, .85, .90, .95, 1
+    };
+    private static final double[] NOISE_MEASURED_LOUDNESS = {
+            -42.1, -42.1, -41.57, -40.36, -38.63, -35.96, -34.24,
+            -30.56, -28.30, -26.78, -26.65, -26.32, -26.07, -25.73,
+            -25.23, -23.44, -21.61, -20.14, -19.03, -18.17, -17.55
+    };
+    private static final double[] NOISE_SYNTH_POSITION = new double[1001];
+    private static final double[] NOISE_LEVEL_GAIN = new double[1001];
+    static {
+        // A 27-position line-input recording showed that the old raw-energy curve
+        // still differed by about 24 LU from sub-Brownian to White. Preserve the
+        // dark end's headroom with only 1.5 dB of boost and obtain most of the
+        // improvement by attenuating the perceptually louder colors. Applying 85%
+        // of the measured correction leaves a gentle difference of roughly 4 LU.
+        final double referenceLoudness = -26.31;
+        final double correctionAmount = 0.85;
+        final double darkestBoostDb = 1.5;
+        final double darkestCorrection = referenceLoudness - NOISE_MEASURED_LOUDNESS[0];
+        final double commonOffsetDb = correctionAmount * darkestCorrection - darkestBoostDb;
+        for (int i = 0; i <= 1000; i++) {
+            double uiPosition = i / 1000.0;
+            // Spread the former 0-1% character over about 0-7%, while retaining
+            // the exact sub-Brownian and Brownian endpoints at 0% and 25%.
+            double synthPosition = uiPosition;
+            if (uiPosition < 0.25) {
+                double t = uiPosition / 0.25;
+                synthPosition = 0.25 * t * t * Math.sqrt(t); // t^2.5
+            }
+            NOISE_SYNTH_POSITION[i] = synthPosition;
+            double measuredLoudness = interpolateNoiseLoudness(synthPosition);
+            double correctionDb = correctionAmount * (referenceLoudness - measuredLoudness)
+                    - commonOffsetDb;
+            double oldSpectralGain = 2.5 - 1.5 * synthPosition;
+            NOISE_LEVEL_GAIN[i] = oldSpectralGain * Math.pow(10, correctionDb / 20.0);
+        }
+    }
     private final Random random = new Random();
     private volatile boolean running;
     private volatile boolean masterMuted;
@@ -26,6 +66,21 @@ final class SynthEngine {
     private Thread worker;
     private AudioTrack track;
     private List<Voice> voices = new ArrayList<>();
+
+    private static double interpolateNoiseLoudness(double position) {
+        for (int i = 1; i < NOISE_MEASURED_POSITIONS.length; i++) {
+            if (position <= NOISE_MEASURED_POSITIONS[i]) {
+                double lowPosition = NOISE_MEASURED_POSITIONS[i - 1];
+                double highPosition = NOISE_MEASURED_POSITIONS[i];
+                double t = (position - lowPosition) / (highPosition - lowPosition);
+                // Smoothstep avoids abrupt gain-slope changes at measurement anchors.
+                t = t * t * (3 - 2 * t);
+                return NOISE_MEASURED_LOUDNESS[i - 1]
+                        + (NOISE_MEASURED_LOUDNESS[i] - NOISE_MEASURED_LOUDNESS[i - 1]) * t;
+            }
+        }
+        return NOISE_MEASURED_LOUDNESS[NOISE_MEASURED_LOUDNESS.length - 1];
+    }
 
     synchronized void setLayers(List<Layer> layers) {
         List<Voice> next = new ArrayList<>();
@@ -149,6 +204,7 @@ final class SynthEngine {
         final int type;
         Layer layer;
         double gain, pan, phase, lfoPhase, brown, pink, ultraBrown;
+        double noisePosition = Double.NaN, noiseLevelGain = Double.NaN;
         double clickCountdown;
         final List<Pulse> pulses = new ArrayList<>();
         Voice(long id, int type, int pan) { this.id = id; this.type = type; this.pan = pan; }
@@ -170,7 +226,17 @@ final class SynthEngine {
                 brown = Math.max(-1, Math.min(1, brown * 0.998 + white * 0.035));
                 // An additional slow low-pass stage makes the far left sub-Brownian.
                 ultraBrown += 0.00035 * (brown - ultraBrown);
-                double position = l.parameter / 1000.0;
+                int color = Math.max(0, Math.min(1000, l.parameter));
+                double targetPosition = NOISE_SYNTH_POSITION[color];
+                double targetLevelGain = NOISE_LEVEL_GAIN[color];
+                if (Double.isNaN(noisePosition)) {
+                    noisePosition = targetPosition;
+                    noiseLevelGain = targetLevelGain;
+                } else {
+                    noisePosition += (targetPosition - noisePosition) * NOISE_COLOR_SMOOTHING;
+                    noiseLevelGain += (targetLevelGain - noiseLevelGain) * NOISE_COLOR_SMOOTHING;
+                }
+                double position = noisePosition;
                 double value;
                 if (position < 0.25) {
                     double blend = position * 4;
@@ -182,10 +248,7 @@ final class SynthEngine {
                     double blend = (position - 0.65) / 0.35;
                     value = pink * 5 * (1 - blend) + white * blend;
                 }
-                // Restore the stable v1.9 compensation curve. The finer 0.1% slider
-                // resolution remains, but the dark-noise character is unchanged.
-                double spectralGain = 2.5 - 1.5 * position;
-                return value * gain * spectralGain;
+                return value * gain * noiseLevelGain;
             }
             if (--clickCountdown <= 0) {
                 double jitter = -Math.log(Math.max(1e-9, random.nextDouble()));
