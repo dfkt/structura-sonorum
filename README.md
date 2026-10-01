@@ -1,6 +1,8 @@
 # Structura Sonorum
 
-An Android sound generator with independent noise, impulse, and sine generators. The signed release APK is approximately 40 KB, without advertising, analytics, bundled media, accounts, or network permission. The only permission requested is permission to show notifications, used to display the triangle in the notification bar and provide mute/unmute, resume, and Exit controls. Each generator has its own volume, pan, sound controls, and mute button. Settings are saved on every change. Playback does not start automatically when the app opens. Generators of the same kind appear together.
+An experimental Android sound tool with multiple independent noise, impulse, and sine generators. Each generator has its own dedicated sound controls, volume, pan, and mute button. Settings are saved on every change, and can be exported and imported. Generators of the same kind appear together.
+
+The signed release APK is approximately 40 KB - without advertising, analytics, bundled media, accounts, or network permission. The only permission requested is permission to show notifications, used to display the triangle in the notification bar and provide play/pause (mute/unmute) and exit controls.
 
 <p align="center">
   <img src="screenshots/structura-sonorum-interface.jpg" alt="Structura Sonorum interface on Android" width="400">
