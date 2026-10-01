@@ -2,6 +2,14 @@
 
 Versions are listed newest first. This history is reconstructed from the development conversations and GitHub commits. Changes from the earliest builds are grouped together because their individual version numbers could not be verified. Dates use Vienna local time.
 
+## 1.14 — 2026-10-01
+
+- Measured the Noise generator at 27 color positions through a professional line-input recording. The previous curve kept raw RMS energy similar at the endpoints but still produced an approximately 24 LU perceived-loudness difference between sub-Brownian and White noise.
+- Expanded the dark **0–25%** color region with a nonlinear mapping. The character previously compressed into roughly 0–1% now occupies approximately the first 7% of the slider, while the 0% sub-Brownian and 25% Brownian endpoints remain unchanged.
+- Added a smooth, measurement-derived loudness-compensation curve. Dark noise receives at most **1.5 dB** of additional gain to protect bass headroom; most correction comes from progressively attenuating perceptually louder colors. The partial correction intentionally retains a small loudness difference rather than risking bass clipping or distortion, and color/gain changes are smoothed in the audio engine.
+- Moved the approximate **Pink** indicator from 65% to **75%**, which is closer to the measured overall spectral slope without changing the deliberately simple noise synthesis method.
+- Updated release metadata to **version 1.14** with `versionCode 24`.
+
 ## 1.13 — 2026-10-01
 
 - Fixed a service lifecycle race introduced in v1.12 when importing a configuration during playback. Fade-out, configuration replacement, and restart now happen in one atomic service command, so Android cannot destroy the newly restarted audio engine between separate Stop and Sync commands.
