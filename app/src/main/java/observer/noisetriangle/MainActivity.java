@@ -75,7 +75,7 @@ public final class MainActivity extends Activity {
             getPreferences(MODE_PRIVATE).edit().putBoolean("notificationExplanationShown", true).apply();
             new AlertDialog.Builder(this)
                     .setTitle("Allow playback controls?")
-                    .setMessage("Structura Sonorum uses notifications only to keep audio playback available in the background and to provide Play/Pause and Exit controls. It does not send promotional notifications.")
+                    .setMessage("Structura Sonorum uses notifications only to keep audio playback available in the background and to provide mute/unmute, resume, and Exit controls. It does not send promotional notifications.")
                     .setNegativeButton("Not now", (dialog, which) -> dialog.dismiss())
                     .setPositiveButton("Continue", (dialog, which) -> requestPermissions(
                             new String[]{Manifest.permission.POST_NOTIFICATIONS}, 1))
@@ -257,13 +257,15 @@ public final class MainActivity extends Activity {
                     .setMessage("Replace your current configuration with the one in this file?")
                     .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                     .setPositiveButton("Import", (dialog, which) -> {
-                        // Drop any paused notification state so its Play action cannot
-                        // resume a previous configuration.
-                        playing = false;
+                        // Replace the service state in order. If sound was already
+                        // playing, SYNC starts the imported configuration after the
+                        // old one has completed its fade-out.
+                        boolean resumeAfterImport = playing;
                         startService(new Intent(this, AudioService.class).setAction(AudioService.STOP));
-                        updateButton();
                         layers = imported;
+                        playing = resumeAfterImport;
                         changed(true);
+                        updateButton();
                         scroll.post(() -> scroll.scrollTo(0, 0));
                         Toast.makeText(this, "Configuration imported", Toast.LENGTH_SHORT).show();
                     }).show();
@@ -303,7 +305,7 @@ public final class MainActivity extends Activity {
     }
     private String getPackageVersion() {
         try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
-        catch (android.content.pm.PackageManager.NameNotFoundException ex) { return "1.11"; }
+        catch (android.content.pm.PackageManager.NameNotFoundException ex) { return "1.12"; }
     }
     private void renderLayers() {
         list.removeAllViews();

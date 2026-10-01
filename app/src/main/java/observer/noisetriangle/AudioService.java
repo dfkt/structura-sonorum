@@ -11,9 +11,6 @@ import android.content.Context;
 import android.content.Intent;
 import android.content.IntentFilter;
 import android.media.AudioManager;
-import android.media.MediaMetadata;
-import android.media.session.MediaSession;
-import android.media.session.PlaybackState;
 import android.os.Build;
 import android.os.IBinder;
 
@@ -30,7 +27,6 @@ public final class AudioService extends Service {
     static volatile boolean isPlaying;
     private final SynthEngine engine = new SynthEngine();
     private AudioManager audioManager;
-    private MediaSession mediaSession;
     private boolean playing, muted, foreground;
     private String lastLayersJson;
     private final AudioManager.OnAudioFocusChangeListener focusListener = change -> {
@@ -43,22 +39,6 @@ public final class AudioService extends Service {
     @Override public void onCreate() {
         super.onCreate();
         audioManager = (AudioManager) getSystemService(AUDIO_SERVICE);
-        mediaSession = new MediaSession(this, "Structura Sonorum");
-        mediaSession.setFlags(MediaSession.FLAG_HANDLES_MEDIA_BUTTONS
-                | MediaSession.FLAG_HANDLES_TRANSPORT_CONTROLS);
-        mediaSession.setMetadata(new MediaMetadata.Builder()
-                .putString(MediaMetadata.METADATA_KEY_TITLE, "Structura Sonorum").build());
-        mediaSession.setCallback(new MediaSession.Callback() {
-            @Override public void onPlay() {
-                startService(new Intent(AudioService.this, AudioService.class).setAction(RESUME));
-            }
-            @Override public void onPause() {
-                startService(new Intent(AudioService.this, AudioService.class).setAction(PAUSE));
-            }
-            @Override public void onStop() {
-                startService(new Intent(AudioService.this, AudioService.class).setAction(STOP));
-            }
-        });
         getSystemService(NotificationManager.class).createNotificationChannel(
                 new NotificationChannel(CHANNEL, "Structura Sonorum playback", NotificationManager.IMPORTANCE_LOW));
         IntentFilter filter = new IntentFilter(AudioManager.ACTION_AUDIO_BECOMING_NOISY);
@@ -129,29 +109,16 @@ public final class AudioService extends Service {
         }
         builder.addAction(new Notification.Action.Builder(R.drawable.ic_remove,
                 "Exit", serviceAction(EXIT, 1)).build());
-        builder.setStyle(new Notification.MediaStyle()
-                .setMediaSession(mediaSession.getSessionToken())
-                .setShowActionsInCompactView(0, 1));
+        builder.setStyle(new Notification.MediaStyle().setShowActionsInCompactView(0, 1));
         return builder.build();
     }
     private void refreshNotification() {
-        updateMediaSession();
         if (foreground) getSystemService(NotificationManager.class).notify(1, notification());
-    }
-    private void updateMediaSession() {
-        if (mediaSession == null) return;
-        long actions = PlaybackState.ACTION_PLAY | PlaybackState.ACTION_PAUSE
-                | PlaybackState.ACTION_PLAY_PAUSE | PlaybackState.ACTION_STOP;
-        mediaSession.setPlaybackState(new PlaybackState.Builder().setActions(actions)
-                .setState(playing ? PlaybackState.STATE_PLAYING : PlaybackState.STATE_PAUSED,
-                        0, playing ? 1 : 0).build());
-        mediaSession.setActive(foreground);
     }
     private void stopPlayback() {
         engine.stop(); audioManager.abandonAudioFocus(focusListener);
         playing = false; isPlaying = false; broadcastState(false);
         if (foreground) { stopForeground(STOP_FOREGROUND_REMOVE); foreground = false; }
-        updateMediaSession();
         stopSelf();
     }
     private void broadcastState(boolean state) {
@@ -161,7 +128,6 @@ public final class AudioService extends Service {
     @Override public void onDestroy() {
         engine.stop(); audioManager.abandonAudioFocus(focusListener);
         isPlaying = false; unregisterReceiver(unplugReceiver);
-        if (mediaSession != null) { mediaSession.setActive(false); mediaSession.release(); }
         super.onDestroy();
     }
     @Override public IBinder onBind(Intent intent) { return null; }

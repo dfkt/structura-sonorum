@@ -12,6 +12,7 @@ final class SynthEngine {
     private static final int RATE = 48000;
     private static final int FADE_IN_SAMPLES = RATE / 50;  // 20 ms
     private static final int FADE_OUT_SAMPLES = RATE * 3 / 100; // 30 ms
+    private static final double PAN_SMOOTHING = 0.002;
     private final Random random = new Random();
     private volatile boolean running;
     private volatile boolean masterMuted;
@@ -31,7 +32,7 @@ final class SynthEngine {
         for (Layer layer : layers) {
             Voice voice = null;
             for (Voice old : voices) if (old.id == layer.id) { voice = old; break; }
-            if (voice == null) voice = new Voice(layer.id, layer.type);
+            if (voice == null) voice = new Voice(layer.id, layer.type, layer.pan);
             voice.layer = layer;
             next.add(voice);
         }
@@ -83,6 +84,7 @@ final class SynthEngine {
     private void render() {
         Process.setThreadPriority(Process.THREAD_PRIORITY_AUDIO);
         short[] pcm = new short[1024 * 2];
+        long submittedFrames = 0;
         while (running) {
             boolean finishAfterBuffer = false;
             synchronized (this) {
@@ -90,7 +92,8 @@ final class SynthEngine {
                     double sumLeft = 0, sumRight = 0;
                     for (Voice v : voices) {
                         double mono = v.sample(random);
-                        double angle = v.layer.pan / 200.0 * Math.PI / 2;
+                        v.pan += (v.layer.pan - v.pan) * PAN_SMOOTHING;
+                        double angle = v.pan / 200.0 * Math.PI / 2;
                         // Equal-power pan, normalized so center retains the previous level.
                         sumLeft += mono * Math.cos(angle) * Math.sqrt(2);
                         sumRight += mono * Math.sin(angle) * Math.sqrt(2);
@@ -113,8 +116,25 @@ final class SynthEngine {
                 int count = current.write(pcm, offset, pcm.length - offset);
                 if (count <= 0) { running = false; break; }
                 offset += count;
+                submittedFrames += count / 2;
             }
-            if (finishAfterBuffer) running = false;
+            if (finishAfterBuffer) {
+                // MODE_STREAM writes are queued. Wait until the final silent end of
+                // the fade reaches the device before stop() is allowed to flush it.
+                waitForPlayback(current, submittedFrames);
+                running = false;
+            }
+        }
+    }
+    private void waitForPlayback(AudioTrack current, long submittedFrames) {
+        long target = submittedFrames & 0xffffffffL;
+        long deadline = System.nanoTime() + 1_000_000_000L;
+        while (System.nanoTime() < deadline) {
+            long played = Integer.toUnsignedLong(current.getPlaybackHeadPosition());
+            long remaining = (target - played) & 0xffffffffL;
+            if (remaining == 0 || remaining > 0x80000000L) return;
+            try { Thread.sleep(2); }
+            catch (InterruptedException ex) { Thread.currentThread().interrupt(); return; }
         }
     }
     private static final class Pulse {
@@ -128,10 +148,10 @@ final class SynthEngine {
         final long id;
         final int type;
         Layer layer;
-        double gain, phase, lfoPhase, brown, pink, ultraBrown;
+        double gain, pan, phase, lfoPhase, brown, pink, ultraBrown;
         double clickCountdown;
         final List<Pulse> pulses = new ArrayList<>();
-        Voice(long id, int type) { this.id = id; this.type = type; }
+        Voice(long id, int type, int pan) { this.id = id; this.type = type; this.pan = pan; }
         double sample(Random random) {
             Layer l = layer;
             double target = l.muted ? 0 : Math.pow(l.volume / 1000.0, 2) * 0.52;
