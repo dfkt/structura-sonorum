@@ -257,14 +257,21 @@ public final class MainActivity extends Activity {
                     .setMessage("Replace your current configuration with the one in this file?")
                     .setNegativeButton("Cancel", (dialog, which) -> dialog.dismiss())
                     .setPositiveButton("Import", (dialog, which) -> {
-                        // Replace the service state in order. If sound was already
-                        // playing, SYNC starts the imported configuration after the
-                        // old one has completed its fade-out.
                         boolean resumeAfterImport = playing;
-                        startService(new Intent(this, AudioService.class).setAction(AudioService.STOP));
                         layers = imported;
-                        playing = resumeAfterImport;
-                        changed(true);
+                        getPreferences(MODE_PRIVATE).edit()
+                                .putString("layers", Layer.encode(layers)).apply();
+                        renderLayers();
+                        if (resumeAfterImport) {
+                            // One service command performs the fade, replacement,
+                            // and restart without a stopSelf()/restart race.
+                            startService(new Intent(this, AudioService.class)
+                                    .setAction(AudioService.IMPORT)
+                                    .putExtra(AudioService.JSON, Layer.encode(layers)));
+                        } else {
+                            startService(new Intent(this, AudioService.class)
+                                    .setAction(AudioService.STOP));
+                        }
                         updateButton();
                         scroll.post(() -> scroll.scrollTo(0, 0));
                         Toast.makeText(this, "Configuration imported", Toast.LENGTH_SHORT).show();
@@ -305,7 +312,7 @@ public final class MainActivity extends Activity {
     }
     private String getPackageVersion() {
         try { return getPackageManager().getPackageInfo(getPackageName(), 0).versionName; }
-        catch (android.content.pm.PackageManager.NameNotFoundException ex) { return "1.12"; }
+        catch (android.content.pm.PackageManager.NameNotFoundException ex) { return "1.13"; }
     }
     private void renderLayers() {
         list.removeAllViews();

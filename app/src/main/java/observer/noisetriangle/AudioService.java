@@ -16,6 +16,7 @@ import android.os.IBinder;
 
 public final class AudioService extends Service {
     static final String SYNC = "observer.noisetriangle.SYNC";
+    static final String IMPORT = "observer.noisetriangle.IMPORT";
     static final String PAUSE = "observer.noisetriangle.PAUSE";
     static final String RESUME = "observer.noisetriangle.RESUME";
     static final String TOGGLE_MUTE = "observer.noisetriangle.TOGGLE_MUTE";
@@ -58,6 +59,27 @@ public final class AudioService extends Service {
         if (TOGGLE_MUTE.equals(action)) {
             muted = !muted;
             engine.setMasterMuted(muted);
+            refreshNotification();
+            return START_NOT_STICKY;
+        }
+        if (IMPORT.equals(action)) {
+            lastLayersJson = intent.getStringExtra(JSON);
+            if (lastLayersJson == null) { pausePlayback(); return START_NOT_STICKY; }
+            // Keep the foreground service and its state alive throughout the
+            // transition. A separate STOP followed by SYNC lets stopSelf()
+            // destroy a newly restarted engine after SYNC has already run.
+            if (!playing) {
+                int focus = audioManager.requestAudioFocus(focusListener, AudioManager.STREAM_MUSIC,
+                        AudioManager.AUDIOFOCUS_GAIN);
+                if (focus != AudioManager.AUDIOFOCUS_REQUEST_GRANTED) {
+                    broadcastState(false); return START_NOT_STICKY;
+                }
+                if (!foreground) { startForeground(1, notification()); foreground = true; }
+            }
+            engine.stop();
+            engine.setLayers(Layer.decode(lastLayersJson));
+            if (!engine.start()) { pausePlayback(); return START_NOT_STICKY; }
+            playing = true; isPlaying = true; broadcastState(true);
             refreshNotification();
             return START_NOT_STICKY;
         }
