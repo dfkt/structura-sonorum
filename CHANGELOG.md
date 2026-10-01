@@ -2,6 +2,14 @@
 
 Versions are listed newest first. This history is reconstructed from the development conversations and GitHub commits. Changes from the earliest builds are grouped together because their individual version numbers could not be verified. Dates use Vienna local time.
 
+## 1.12 — 2026-10-01
+
+- Removed the v1.11 platform media session and headset-button integration because it caused regressions on Samsung devices: the triangle status icon disappeared, Exit was omitted, and Android added a nonfunctional progress bar. Restored the compact notification presentation used before v1.11.
+- Corrected playback shutdown so the queued fade-out reaches the audio device before the stream is flushed and released, addressing hard clicks during pause, import, and exit.
+- Smoothed stereo pan changes inside the audio engine so tapping a new pan position does not create an abrupt waveform discontinuity.
+- Changed configuration import to preserve the preceding playback state: importing while playing automatically starts the imported configuration after the old sound fades out; importing while paused remains paused.
+- Updated release metadata to **version 1.12** with `versionCode 22`.
+
 ## 1.11 — 2026-10-01
 
 - Extended the Impulse speed range from **20–200 BPM** to **20–400 BPM**, with **0.1 BPM** internal resolution.
